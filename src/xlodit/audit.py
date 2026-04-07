@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from openpyxl import load_workbook
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
@@ -42,9 +43,13 @@ def _formula_issues(
     values_wb,
     workbook_path: Path,
     max_traceback_depth: int,
+    progress_cb: Callable[[str, int, int], None] | None = None,
 ) -> list[AuditIssue]:
     issues: list[AuditIssue] = []
-    for sheet in source_wb.worksheets:
+    total_sheets = len(source_wb.worksheets)
+    for idx, sheet in enumerate(source_wb.worksheets, start=1):
+        if progress_cb is not None:
+            progress_cb(sheet.title, idx, total_sheets)
         values_sheet = values_wb[sheet.title] if sheet.title in values_wb else None
         for row in sheet.iter_rows():
             for cell in row:
@@ -114,8 +119,23 @@ def _report(
 
 
 def audit_workbook(
-    path: str, backend: str = "auto", max_traceback_depth: int = 10
+    path: str,
+    backend: str = "auto",
+    max_traceback_depth: int = 10,
+    progress_cb: Callable[[str, int, int], None] | None = None,
 ) -> AuditReport:
+    """Audit an .xlsx workbook and return a structured report.
+
+    Args:
+        path: Path to the workbook file.
+        backend: Recalculation backend: "auto", "libreoffice", or "none".
+        max_traceback_depth: Maximum depth for formula traceback traversal.
+        progress_cb: Optional callback invoked per worksheet as
+            progress_cb(sheet_name, current_index, total_sheets).
+
+    Returns:
+        AuditReport with summary, backend info, and detected issues.
+    """
     workbook_path = Path(path)
     backend_info = BackendInfo(requested=backend, used="none", recalculated=False)
 
@@ -180,7 +200,13 @@ def audit_workbook(
     issues: list[AuditIssue] = []
     issues.extend(structural_issues(source_wb, workbook_path))
     issues.extend(
-        _formula_issues(source_wb, values_wb, workbook_path, max_traceback_depth)
+        _formula_issues(
+            source_wb,
+            values_wb,
+            workbook_path,
+            max_traceback_depth,
+            progress_cb,
+        )
     )
     issues.extend(numeric_text_issues(values_wb, workbook_path))
     return _report(backend_info, issues, audit_completed=True)

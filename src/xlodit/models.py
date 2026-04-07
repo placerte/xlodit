@@ -15,6 +15,7 @@ class BackendInfo:
 class TracebackNode:
     sheet: str
     cell: str
+    failing: bool = False
     value: Any = None
     children: list["TracebackNode"] = field(default_factory=list)
 

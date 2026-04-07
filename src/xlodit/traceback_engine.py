@@ -66,9 +66,11 @@ def _trace_node(
     path: set[tuple[str, str]],
     state: _TraceState,
 ) -> TracebackNode:
+    failing = _is_failing_formula(source_wb, values_wb, current.sheet, current.cell)
     node = TracebackNode(
         sheet=current.sheet,
         cell=current.cell,
+        failing=failing,
         value=_display_value(values_wb, current.sheet, current.cell),
     )
     key = (current.sheet, current.cell)
